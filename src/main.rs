@@ -7,12 +7,12 @@ use hyper::{Body, Request, Response, Server};
 use hyper::service::service_fn_ok;
 use hyper::rt::{self, Future};
 use std::sync::{Arc, Mutex};
-use snake_rs::game::Snake;
+use snake_rs::game::{Snake, Point};
 
 fn main() {
     simple_logger::init().unwrap();
     let addr = ([127, 0, 0, 1], 3000).into();
-    let my_v= Arc::new(Mutex::new(vec![]));
+    let my_v:Arc<Mutex<Vec<Snake>>>= Arc::new(Mutex::new(vec![]));
 
     let server = Server::bind(&addr)
         .serve( move || {
@@ -23,7 +23,11 @@ fn main() {
             service_fn_ok(move |_: Request<Body>| {
                 let a =  Arc::clone(&aa);
                 let mut m = a.lock().unwrap();
-                m.push(1);
+                let new_snake = Snake::new(3, Point::new(10,10));
+                m.push(new_snake);
+                for snake in m.iter_mut() {
+                    snake.tick();
+                }
                 Response::new(Body::from(format!("vec {:?}", m)))
             })
         })

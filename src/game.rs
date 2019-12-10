@@ -2,8 +2,17 @@ use std::collections::VecDeque;
 
 #[derive(Debug)]
 pub struct Point {
-    x: u32,
-    y: u32
+    x: usize,
+    y: usize
+}
+
+impl Point {
+    pub fn new(x: usize, y:usize) -> Point {
+        Point{
+            x: x,
+            y: x
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -15,7 +24,7 @@ pub enum Direction {
 }
 
 #[derive(Debug)]
-struct Snake {
+pub struct Snake {
     points: VecDeque<Point>,
     length: usize,
     direction: Direction
