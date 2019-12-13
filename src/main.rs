@@ -1,39 +1,33 @@
-extern crate hyper;
 extern crate simple_logger;
 extern crate log;
 extern crate snake_rs;
-
-use hyper::{Body, Request, Response, Server};
-use hyper::service::service_fn_ok;
-use hyper::rt::{self, Future};
+extern crate tokio;
+use warp::{self, path, Filter};
 use std::sync::{Arc, Mutex};
 use snake_rs::game::{Snake, Point};
 
-fn main() {
+#[tokio::main]
+async fn main() {
     simple_logger::init().unwrap();
-    let addr = ([127, 0, 0, 1], 3000).into();
-    let my_v:Arc<Mutex<Vec<Snake>>>= Arc::new(Mutex::new(vec![]));
 
-    let server = Server::bind(&addr)
-        .serve( move || {
-            let aa = Arc::clone(&my_v);
-            // This is the `Service` that will handle the connection.
-            // `service_fn_ok` is a helper to convert a function that
-            // returns a Response into a `Service`.
-            service_fn_ok(move |_: Request<Body>| {
-                let a =  Arc::clone(&aa);
-                let mut m = a.lock().unwrap();
-                let new_snake = Snake::new(3, Point::new(10,10));
-                m.push(new_snake);
-                for snake in m.iter_mut() {
-                    snake.tick();
-                }
-                Response::new(Body::from(format!("vec {:?}", m)))
-            })
-        })
-        .map_err(|e| eprintln!("server error: {}", e));
+    let game_state: Vec<Snake> = vec![];
+    let game_state_arc: Arc<Mutex<Vec<Snake>>> = Arc::new(Mutex::new(game_state));
 
-    println!("Listening on http://{}", addr);
+    let assets = warp::fs::dir("assets");
+    let index = warp::path::end().and(assets.clone());
 
-    rt::run(server);
+    let v1_route = path("v1");
+
+    let sum = v1_route
+        .and(path!("sum" / u32 / u32)
+            .map(move|a, b| {
+                let a = Arc::clone(&game_state_arc);
+                let mut l = a.lock().unwrap();
+                l.push(Snake::new(1, Point::new(1,2)));
+                std::format!("{:?}", l)
+            }));
+
+    let routes = warp::get2().and(sum.or(index));
+    warp::serve(routes).run(([127, 0, 0, 1], 3030));
+
 }
