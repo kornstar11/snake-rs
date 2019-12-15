@@ -1,4 +1,9 @@
-use std::collections::VecDeque;
+extern crate log;
+use std::collections::{VecDeque, HashMap};
+use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread::sleep;
+
 //use serde::{Deserialize, Serialize};
 #[derive(Debug)]
 pub struct Point {
@@ -88,6 +93,71 @@ impl Snake {
         }
     }
 }
+
+#[derive(Debug)]
+pub enum StateUpdate {
+    Tick,
+    ChangeDirection(usize, Direction)
+}
+
+#[derive(Debug)]
+pub struct GameState {
+    snakes: HashMap<usize, Snake>,
+    id_gen: AtomicUsize,
+}
+
+impl GameState {
+    pub fn new() -> GameState {
+        let snakes: HashMap<usize, Snake> = HashMap::new();
+        let id_gen = AtomicUsize::new(0);
+
+        GameState{
+            snakes,
+            id_gen,
+        }
+    }
+
+    fn tick(&mut self) {
+        for (id, snake) in self.snakes.iter_mut() {
+            snake.tick();
+        }
+        //TODO detect collisions
+    }
+
+    pub fn get_snakes(&self) -> &HashMap<usize, Snake> {
+        &self.snakes
+    }
+
+    pub fn handle(&mut self, update: StateUpdate) {
+        log::debug!("Handling {:?}", update);
+        match update {
+            StateUpdate::Tick => {
+                self.tick();
+            },
+            StateUpdate::ChangeDirection(id, direction) => {
+                if let Some(snake) = self
+                    .snakes
+                    .get_mut(&id) {
+                    snake.set_direction(direction);
+                } else {
+                    log::warn!("Missing id {}", id);
+                }
+            }
+        }
+    }
+
+    pub fn create_snake(&mut self) -> usize {
+        let new_id = self.id_gen.fetch_add(1, Ordering::SeqCst);
+        let starting_point = Point{x: 10, y: 10};
+        self
+            .snakes
+            .insert(new_id, Snake::new(3, starting_point));
+        new_id
+    }
+
+
+}
+
 #[cfg(test)]
 mod tests {
     use crate::game::*;
