@@ -1,38 +1,35 @@
 extern crate log;
-use std::collections::{VecDeque, HashMap};
-use std::sync::{Arc, Mutex};
+use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 
 //use serde::{Deserialize, Serialize};
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Point {
     x: usize,
-    y: usize
+    y: usize,
 }
 
 impl Point {
-    pub fn new(x: usize, y:usize) -> Point {
-        Point{
-            x: x,
-            y: x
-        }
+    pub fn new(x: usize, y: usize) -> Point {
+        Point { x: x, y: x }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Direction {
     Up,
     Down,
     Left,
-    Right
+    Right,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Snake {
     points: VecDeque<Point>,
     length: usize,
-    direction: Direction
+    direction: Direction,
 }
 
 impl Snake {
@@ -42,7 +39,7 @@ impl Snake {
         Snake {
             points: new_queue,
             length: length,
-            direction: Direction::Right
+            direction: Direction::Right,
         }
     }
 
@@ -63,31 +60,23 @@ impl Snake {
 
     pub fn tick(&mut self) {
         if let Some(front) = self.points.front() {
-            let new_point = match  self.direction {
-                Direction::Up => {
-                    Point{
-                        x: front.x,
-                        y: front.y + 1
-                    }
-                }
-                Direction::Down => {
-                    Point{
-                        x: front.x,
-                        y: front.y - 1
-                    }
-                }
-                Direction::Right => {
-                    Point{
-                        x: front.x + 1,
-                        y: front.y
-                    }
-                }
-                Direction::Left => {
-                    Point{
-                        x: front.x - 1,
-                        y: front.y
-                    }
-                }
+            let new_point = match self.direction {
+                Direction::Up => Point {
+                    x: front.x,
+                    y: front.y + 1,
+                },
+                Direction::Down => Point {
+                    x: front.x,
+                    y: front.y - 1,
+                },
+                Direction::Right => Point {
+                    x: front.x + 1,
+                    y: front.y,
+                },
+                Direction::Left => Point {
+                    x: front.x - 1,
+                    y: front.y,
+                },
             };
             self.add_point(new_point);
         }
@@ -97,7 +86,7 @@ impl Snake {
 #[derive(Debug)]
 pub enum StateUpdate {
     Tick,
-    ChangeDirection(usize, Direction)
+    ChangeDirection(usize, Direction),
 }
 
 #[derive(Debug)]
@@ -111,10 +100,7 @@ impl GameState {
         let snakes: HashMap<usize, Snake> = HashMap::new();
         let id_gen = AtomicUsize::new(0);
 
-        GameState{
-            snakes,
-            id_gen,
-        }
+        GameState { snakes, id_gen }
     }
 
     fn tick(&mut self) {
@@ -124,8 +110,12 @@ impl GameState {
         //TODO detect collisions
     }
 
-    pub fn get_snakes(&self) -> &HashMap<usize, Snake> {
+    pub fn get_snakes_ref(&self) -> &HashMap<usize, Snake> {
         &self.snakes
+    }
+
+    pub fn get_snakes(&self) -> HashMap<usize, Snake> {
+        self.snakes.clone()
     }
 
     pub fn handle(&mut self, update: StateUpdate) {
@@ -133,11 +123,9 @@ impl GameState {
         match update {
             StateUpdate::Tick => {
                 self.tick();
-            },
+            }
             StateUpdate::ChangeDirection(id, direction) => {
-                if let Some(snake) = self
-                    .snakes
-                    .get_mut(&id) {
+                if let Some(snake) = self.snakes.get_mut(&id) {
                     snake.set_direction(direction);
                 } else {
                     log::warn!("Missing id {}", id);
@@ -148,14 +136,10 @@ impl GameState {
 
     pub fn create_snake(&mut self) -> usize {
         let new_id = self.id_gen.fetch_add(1, Ordering::SeqCst);
-        let starting_point = Point{x: 10, y: 10};
-        self
-            .snakes
-            .insert(new_id, Snake::new(3, starting_point));
+        let starting_point = Point { x: 10, y: 10 };
+        self.snakes.insert(new_id, Snake::new(3, starting_point));
         new_id
     }
-
-
 }
 
 #[cfg(test)]
@@ -164,10 +148,7 @@ mod tests {
 
     #[test]
     fn test_snake_growth() {
-        let start_point = Point{
-            x: 10,
-            y: 10
-        };
+        let start_point = Point { x: 10, y: 10 };
 
         let mut snake = Snake::new(3, start_point);
 
