@@ -1,11 +1,9 @@
 extern crate log;
 use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
-use std::thread::sleep;
+use serde::{Deserialize, Serialize};
 
-//use serde::{Deserialize, Serialize};
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Point {
     x: usize,
     y: usize,
@@ -17,7 +15,7 @@ impl Point {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Direction {
     Up,
     Down,
@@ -25,7 +23,7 @@ pub enum Direction {
     Right,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Snake {
     points: VecDeque<Point>,
     length: usize,
