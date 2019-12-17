@@ -4,25 +4,25 @@ extern crate snake_rs;
 extern crate tokio;
 #[macro_use]
 use futures::future::Future;
-use futures::stream::poll_fn;
 use futures::stream;
-use futures::stream::{Stream};
-use futures::sync::mpsc::{Sender, Receiver};
+use futures::stream::poll_fn;
+use futures::stream::Stream;
 use futures::sync::mpsc::channel;
+use futures::sync::mpsc::{Receiver, Sender};
 //use stream::channel::{Sender, Receiver};
+use futures::future::Err;
 use futures::sink::Sink;
 use futures::{Async, Poll};
-use futures::future::Err;
-use snake_rs::game::{GameState, Point, Snake, StateUpdate, Direction};
+use snake_rs::game::{Direction, GameState, Point, Snake, StateUpdate};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
-use warp::filters::path::full;
-use warp::{self, path, Filter};
-use warp::filters::ws::{Message, WebSocket};
 use warp::filters::fs::dir;
+use warp::filters::path::full;
+use warp::filters::ws::{Message, WebSocket};
+use warp::{self, path, Filter};
 
 fn main() {
     simple_logger::init().unwrap();
@@ -59,19 +59,24 @@ fn main() {
                     //add our channel
                     game_tick.push(update_tx);
 
-                    let update_rx= update_rx
+                    let update_rx = update_rx
                         .map_err(|()| -> warp::Error { unreachable!("whoa") })
                         .map(|state| {
-                        let my_snake = state.get(&snake_id).expect("missing id");
-                        let as_json = serde_json::to_string(my_snake).expect("json failed");
-                        Message::text(as_json)
-                    });
+                            let my_snake = state.get(&snake_id).expect("missing id");
+                            let as_json = serde_json::to_string(my_snake).expect("json failed");
+                            Message::text(as_json)
+                        });
                     let ford = update_rx.forward(ws_tx);
 
-                    let r_fut  = rx.and_then(move |input: Message| {
+                    let r_fut = rx.and_then(move |input: Message| {
                         let message_string = input.to_str().unwrap();
                         let direction: Direction = serde_json::from_str(message_string).unwrap();
-                        log::debug!("Got input {} {:?} {:?}", snake_id, message_string, direction);
+                        log::debug!(
+                            "Got input {} {:?} {:?}",
+                            snake_id,
+                            message_string,
+                            direction
+                        );
                         let state = state.clone();
                         let mut state = state.lock().unwrap();
                         state.handle(StateUpdate::ChangeDirection(snake_id, direction));
@@ -97,7 +102,7 @@ fn main() {
 
 fn start_ticking(
     game_state_arc: &Arc<Mutex<GameState>>,
-    to_send: Arc<Mutex<Vec<Sender<HashMap<usize, Snake>>>>>
+    to_send: Arc<Mutex<Vec<Sender<HashMap<usize, Snake>>>>>,
 ) {
     tokio::run({
         let local_state = game_state_arc.clone();
@@ -112,7 +117,9 @@ fn start_ticking(
                 local_state.handle(StateUpdate::Tick);
 
                 for send_to in to_send.iter_mut() {
-                    send_to.try_send(local_state.get_snakes()).expect("to_send failed");
+                    send_to
+                        .try_send(local_state.get_snakes())
+                        .expect("to_send failed");
                 }
 
                 //tick_tx.try_send(Arc::new(local_state.get_snakes()));
