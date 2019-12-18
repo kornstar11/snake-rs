@@ -2,26 +2,17 @@ extern crate log;
 extern crate simple_logger;
 extern crate snake_rs;
 extern crate tokio;
-#[macro_use]
 use futures::future::Future;
-use futures::stream;
-use futures::stream::poll_fn;
 use futures::stream::Stream;
 use futures::sync::mpsc::channel;
-use futures::sync::mpsc::{Receiver, Sender};
+use futures::sync::mpsc::Sender;
 //use stream::channel::{Sender, Receiver};
-use futures::future::Err;
-use futures::sink::Sink;
-use futures::{Async, Poll};
-use snake_rs::game::{Direction, GameState, Point, Snake, StateUpdate};
+use snake_rs::game::{Direction, GameState, Snake, StateUpdate};
 use std::collections::HashMap;
-use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
-use warp::filters::fs::dir;
-use warp::filters::path::full;
-use warp::filters::ws::{Message, WebSocket};
+use warp::filters::ws::Message;
 use warp::{self, path, Filter};
 
 fn main() {
@@ -45,7 +36,6 @@ fn main() {
             .map(move |ws: warp::ws::Ws2| {
                 let state = connect_state.clone();
                 let game_tick = game_tick.clone();
-                // And then our closure will be called when it completes...
                 ws.on_upgrade(move |websocket| {
                     let (ws_tx, rx) = websocket.split();
                     let (update_tx, update_rx) = channel(1);
@@ -61,14 +51,16 @@ fn main() {
 
                     let update_rx = update_rx
                         .map_err(|()| -> warp::Error { unreachable!("whoa") })
-                        .map(|state| {
+                        .map(move |state| {
                             let my_snake = state.get(&snake_id).expect("missing id");
                             let as_json = serde_json::to_string(my_snake).expect("json failed");
                             Message::text(as_json)
                         });
-                    let ford = update_rx.forward(ws_tx);
 
-                    let r_fut = rx.and_then(move |input: Message| {
+                    let mapped_tx = update_rx.forward(ws_tx);
+                    //.map_err(|_|  {()})
+
+                    let rx_fut = rx.and_then(move |input: Message| {
                         let message_string = input.to_str().unwrap();
                         let direction: Direction = serde_json::from_str(message_string).unwrap();
                         log::debug!(
@@ -82,9 +74,14 @@ fn main() {
                         state.handle(StateUpdate::ChangeDirection(snake_id, direction));
                         Ok(())
                     });
-                    //r_fut.map(|()| ())
-                    //    .map_err(|e| -> warp::Error { unreachable!("whoa") })
-                    futures::future::ok(())
+                    let mapped_rx = rx_fut.map_err(|_| ()).for_each(|_| futures::future::ok(()));
+
+                    let selected = futures::Future::select2(mapped_tx, mapped_rx)
+                        .map_err(|_| ())
+                        .map(|_| ());
+                    selected
+                    //mapped_rx
+                    //futures::future::ok(())
                     //                rx.forward(tx).map(|_| ()).map_err(|e| {
                     //                    eprintln!("websocket error: {:?}", e);
                     //                })
