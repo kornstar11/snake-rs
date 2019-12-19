@@ -1,6 +1,10 @@
 
 jQuery( document ).ready(function() {
-    let socket = new WebSocket("wss://:3031/v1/connect");
+    console.log("Hello");
+    let socket = new WebSocket('ws://' + location.host + '/v1/connect');
+    socket.onopen = function() {
+        console.log("Socket opened.")
+    }
     socket.onmessage = function(event) {
       let message = event.data;
       console.log(message);

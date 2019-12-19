@@ -32,7 +32,6 @@ fn main() {
     let connect_state = game_state_arc.clone(); //needing to clone this for every closure seem waseful, can i just use static?
     let connect_route =
         v1_route
-            .and(v1_route)
             .and(path!("connect"))
             .and(warp::ws2())
             .map(move |ws: warp::ws::Ws2| {
@@ -112,6 +111,7 @@ fn start_ticking(
     game_state_arc: Arc<Mutex<GameState>>,
     to_send: Arc<Mutex<Vec<Sender<HashMap<usize, Snake>>>>>,
 ) -> impl Future<Item = (), Error = ()> {
+    use std::sync::mpsc::TrySendError;
     let local_state = game_state_arc.clone();
     let ticker = Interval::new(Instant::now(), Duration::from_millis(500));
     ticker
@@ -122,6 +122,8 @@ fn start_ticking(
             let to_send = to_send.clone();
             let mut to_send = to_send.try_lock().unwrap(); //.handle(StateUpdate::Tick);
             local_state.handle(StateUpdate::Tick);
+
+            to_send.retain(|sender| !sender.is_closed());//.iter_mut().filter(|sender| )
 
             for send_to in to_send.iter_mut() {
                 send_to
