@@ -111,7 +111,6 @@ fn start_ticking(
     game_state_arc: Arc<Mutex<GameState>>,
     to_send: Arc<Mutex<Vec<Sender<HashMap<usize, Snake>>>>>,
 ) -> impl Future<Item = (), Error = ()> {
-    use std::sync::mpsc::TrySendError;
     let local_state = game_state_arc.clone();
     let ticker = Interval::new(Instant::now(), Duration::from_millis(500));
     ticker
