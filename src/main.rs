@@ -21,7 +21,6 @@ fn main() {
     let game_tick: Arc<Mutex<Vec<Sender<HashMap<usize, Snake>>>>> = Arc::new(Mutex::new(vec![]));
     let ticker_fut = start_ticking(game_state_arc.clone(), game_tick.clone());
 
-
     let assets = warp::fs::dir("assets");
     let index = warp::path::end().and(assets.clone());
 
@@ -53,32 +52,35 @@ fn main() {
                     let update_rx = update_rx
                         .map_err(|()| -> warp::Error { unreachable!("whoa") })
                         .map(move |state| {
-                            let my_snake = state.get(&snake_id).expect("missing id");
-                            let as_json = serde_json::to_string(my_snake).expect("json failed");
-                            Message::text(as_json)
+                            //let my_snake = state.get(&snake_id).expect("missing id");
+                            let (my_snake, other_snakes): (Vec<(&usize, &Snake)>, Vec<(&usize, &Snake)>) = state
+                                .iter()
+                                .partition(|t| {
+                                    let (&id, _) = t;
+                                    id == snake_id
+                                });
+                            let my_snake = my_snake.first().expect("missing snake id");
+                            let json_blob = serde_json::json!({
+                                "my_snake": my_snake,
+                                "other_snakes": other_snakes
+                            });
+                            //let as_json = serde_json::to_string(my_snake).expect("json failed");
+                            Message::text(json_blob.to_string())
                         });
 
                     let mapped_tx = update_rx.forward(ws_tx);
 
-                    let rx_fut = rx.and_then(move |input: Message| {
+                    let rx_fut = rx.map(move |input: Message| {
                         let message_string = input.to_str().unwrap();
-                        let direction: Direction = serde_json::from_str(message_string).unwrap();
-                        log::debug!(
-                            "Got input {} {:?} {:?}",
-                            snake_id,
-                            message_string,
-                            direction
-                        );
-                        let state = state.clone();
-                        let mut state = state.lock().unwrap();
-                        state.handle(StateUpdate::ChangeDirection(snake_id, direction));
-                        Ok(())
+                        handle_game_input(message_string, snake_id, state.clone())
                     });
                     let mapped_rx = rx_fut.map_err(|_| ()).for_each(|_| futures::future::ok(()));
 
                     let selected = futures::Future::select2(mapped_tx, mapped_rx)
                         .map_err(|_| ())
-                        .map(|_| ());
+                        .map(move |_| {
+                           log::info!("Disconnecting...");
+                        });
                     selected
                 })
             });
@@ -107,12 +109,24 @@ fn main() {
 
 }
 
+fn handle_game_input(message_string: &str, snake_id: usize, state: Arc<Mutex<GameState>>) {
+    let direction: Direction = serde_json::from_str(message_string).unwrap();
+    log::debug!(
+                            "Got input {} {:?} {:?}",
+                            snake_id,
+                            message_string,
+                            direction
+                        );
+    let mut state = state.lock().unwrap();
+    state.handle(StateUpdate::ChangeDirection(snake_id, direction));
+}
+
 fn start_ticking(
     game_state_arc: Arc<Mutex<GameState>>,
     to_send: Arc<Mutex<Vec<Sender<HashMap<usize, Snake>>>>>,
 ) -> impl Future<Item = (), Error = ()> {
     let local_state = game_state_arc.clone();
-    let ticker = Interval::new(Instant::now(), Duration::from_millis(500));
+    let ticker = Interval::new(Instant::now(), Duration::from_millis(100));
     ticker
         //.map_err(|e| panic!("timer failed; err={:?}", e))
         .for_each(move |_| {

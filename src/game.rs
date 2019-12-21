@@ -102,7 +102,7 @@ impl GameState {
     }
 
     fn tick(&mut self) {
-        for (id, snake) in self.snakes.iter_mut() {
+        for (_, snake) in self.snakes.iter_mut() {
             snake.tick();
         }
         //TODO detect collisions
@@ -135,7 +135,7 @@ impl GameState {
     pub fn create_snake(&mut self) -> usize {
         let new_id = self.id_gen.fetch_add(1, Ordering::SeqCst);
         let starting_point = Point { x: 10, y: 10 };
-        self.snakes.insert(new_id, Snake::new(3, starting_point));
+        self.snakes.insert(new_id, Snake::new(30, starting_point));
         new_id
     }
 }

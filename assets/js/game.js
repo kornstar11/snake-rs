@@ -1,12 +1,34 @@
 
 jQuery( document ).ready(function() {
     console.log("Hello");
+    //{"my_snake":[0,{"direction":"Right","length":3,"points":[{"x":70,"y":10},{"x":69,"y":10},{"x":68,"y":10}]}],"other_snakes":[[1,{"direction":"Right","length":3,"points":[{"x":45,"y":10},{"x":44,"y":10},{"x":43,"y":10}]}]]}
+    let canvas = document.getElementById('canvas');
+    let ctx = canvas.getContext('2d');
+
     let socket = new WebSocket('ws://' + location.host + '/v1/connect');
     socket.onopen = function() {
         console.log("Socket opened.")
     }
     socket.onmessage = function(event) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       let message = event.data;
-      console.log(message);
+      let obj = JSON.parse(message);
+      let my_snake = obj["my_snake"][1];
+      let points = my_snake["points"];
+
+      ctx.beginPath();
+      let first = true;
+      for (const idx in points) {
+        let point = points[idx];
+        if(first == true) {
+            ctx.moveTo(point["x"], point["y"]);
+            first = false;
+        } else {
+            ctx.lineTo(point["x"], point["y"]);
+        }
+     }
+     ctx.stroke();
+
+      console.log(obj, my_snake);
     };
 });
