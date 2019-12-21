@@ -61,11 +61,11 @@ impl Snake {
             let new_point = match self.direction {
                 Direction::Up => Point {
                     x: front.x,
-                    y: front.y + 1,
+                    y: front.y - 1,
                 },
                 Direction::Down => Point {
                     x: front.x,
-                    y: front.y - 1,
+                    y: front.y + 1,
                 },
                 Direction::Right => Point {
                     x: front.x + 1,

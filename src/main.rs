@@ -15,7 +15,7 @@ use warp::filters::ws::Message;
 use warp::{self, path, Filter};
 
 fn main() {
-    simple_logger::init().unwrap();
+    //simple_logger::init().unwrap();
 
     let game_state_arc: Arc<Mutex<GameState>> = Arc::new(Mutex::new(GameState::new()));
     let game_tick: Arc<Mutex<Vec<Sender<HashMap<usize, Snake>>>>> = Arc::new(Mutex::new(vec![]));
@@ -110,15 +110,32 @@ fn main() {
 }
 
 fn handle_game_input(message_string: &str, snake_id: usize, state: Arc<Mutex<GameState>>) {
-    let direction: Direction = serde_json::from_str(message_string).unwrap();
-    log::debug!(
-                            "Got input {} {:?} {:?}",
-                            snake_id,
-                            message_string,
-                            direction
-                        );
-    let mut state = state.lock().unwrap();
-    state.handle(StateUpdate::ChangeDirection(snake_id, direction));
+    let direction: Option<Direction> = match message_string {
+        "Right" => {
+            Some(Direction::Right)
+        }
+        "Left" => {
+            Some(Direction::Left)
+        }
+        "Down" => {
+            Some(Direction::Down)
+        }
+        "Up" => {
+            Some(Direction::Up)
+        }
+        _ => None
+    };//serde_json::from_str(message_string).unwrap();
+
+    if let Some(direction) = direction {
+        println!(
+            "Got input {} {:?} {:?}",
+            snake_id,
+            message_string,
+            direction
+        );
+        let mut state = state.lock().unwrap();
+        state.handle(StateUpdate::ChangeDirection(snake_id, direction));
+    }
 }
 
 fn start_ticking(

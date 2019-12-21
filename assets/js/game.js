@@ -4,11 +4,12 @@ jQuery( document ).ready(function() {
     //{"my_snake":[0,{"direction":"Right","length":3,"points":[{"x":70,"y":10},{"x":69,"y":10},{"x":68,"y":10}]}],"other_snakes":[[1,{"direction":"Right","length":3,"points":[{"x":45,"y":10},{"x":44,"y":10},{"x":43,"y":10}]}]]}
     let canvas = document.getElementById('canvas');
     let ctx = canvas.getContext('2d');
-
     let socket = new WebSocket('ws://' + location.host + '/v1/connect');
+
     socket.onopen = function() {
         console.log("Socket opened.")
     }
+
     socket.onmessage = function(event) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       let message = event.data;
@@ -29,6 +30,25 @@ jQuery( document ).ready(function() {
      }
      ctx.stroke();
 
-      console.log(obj, my_snake);
+      //console.log(obj, my_snake);
     };
+
+    document.addEventListener('keydown', (event) => {
+        console.log(event)
+        let keyCode = event['code'];
+        let toSend = null;
+        if(keyCode === 'ArrowUp') {
+            toSend = 'Up';
+        } else if (keyCode === 'ArrowDown') {
+            toSend = 'Down';
+        } else if (keyCode === 'ArrowLeft') {
+            toSend = 'Left';
+        } else if (keyCode === 'ArrowRight') {
+            toSend = 'Right';
+        }
+
+        if(toSend != null) {
+            socket.send(toSend);
+        }
+    })
 });
