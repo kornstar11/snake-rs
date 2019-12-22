@@ -41,6 +41,7 @@ fn main() {
                     let (update_tx, update_rx) = channel(1);
 
                     let state_l = state.clone();
+                    let state_2 = state.clone();
                     let mut state_l = state_l.lock().unwrap();
                     let snake_id = state_l.create_snake();
 
@@ -82,7 +83,9 @@ fn main() {
                     let selected = futures::Future::select2(mapped_tx, mapped_rx)
                         .map_err(|_| ())
                         .map(move |_| {
-                           println!("Disconnecting...");
+                            let mut state_2 = state_2.lock().unwrap();
+                            state_2.handle(StateUpdate::DropSnake(snake_id));
+                            println!("Disconnecting...");
                         });
                     selected
                 })

@@ -111,6 +111,7 @@ impl Snake {
 pub enum StateUpdate {
     Tick,
     ChangeDirection(usize, Direction),
+    DropSnake(usize),
 }
 
 #[derive(Debug)]
@@ -176,6 +177,9 @@ impl GameState {
                 } else {
                     log::warn!("Missing id {}", id);
                 }
+            }
+            StateUpdate::DropSnake(id) => {
+                self.snakes.remove(&id);
             }
         }
     }
