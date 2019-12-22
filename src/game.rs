@@ -1,9 +1,9 @@
 extern crate log;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, VecDeque, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Hash, PartialEq, Eq, Copy)]
 pub struct Point {
     x: usize,
     y: usize,
@@ -13,6 +13,12 @@ impl Point {
     pub fn new(x: usize, y: usize) -> Point {
         Point { x: x, y: x }
     }
+}
+
+pub struct Box {
+    start_point: Point,
+    width: usize,
+    height: usize
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,6 +34,7 @@ pub struct Snake {
     points: VecDeque<Point>,
     length: usize,
     direction: Direction,
+    is_alive: bool,
 }
 
 impl Snake {
@@ -38,6 +45,7 @@ impl Snake {
             points: new_queue,
             length: length,
             direction: Direction::Right,
+            is_alive: true
         }
     }
 
@@ -52,8 +60,26 @@ impl Snake {
         }
     }
 
+
     pub fn set_direction(&mut self, direction: Direction) {
-        self.direction = direction;
+        let is_valid_change = match (&direction, &self.direction) {
+            (Direction::Left, Direction::Right) => {
+                false
+            }
+            (Direction::Right, Direction::Left) => {
+                false
+            }
+            (Direction::Up, Direction::Down) => {
+                false
+            }
+            (Direction::Down, Direction::Up) => {
+                false
+            }
+            _ => true
+        };
+        if is_valid_change {
+            self.direction = direction;
+        }
     }
 
     pub fn tick(&mut self) {
@@ -91,19 +117,41 @@ pub enum StateUpdate {
 pub struct GameState {
     snakes: HashMap<usize, Snake>,
     id_gen: AtomicUsize,
+    points_set: HashSet<Point>,
+    food_set: HashSet<Point>,
+    x_size: usize,
+    y_size: usize
+
 }
 
 impl GameState {
     pub fn new() -> GameState {
         let snakes: HashMap<usize, Snake> = HashMap::new();
+        let points_set: HashSet<Point> = HashSet::new();
+        let food_set: HashSet<Point> = HashSet::new();
         let id_gen = AtomicUsize::new(0);
 
-        GameState { snakes, id_gen }
+        GameState { snakes, id_gen, points_set, food_set,x_size: 768, y_size: 512 }
     }
 
     fn tick(&mut self) {
         for (_, snake) in self.snakes.iter_mut() {
             snake.tick();
+        }
+
+        self.points_set.clear();
+        for (_, snake) in self.snakes.iter_mut() {
+            let is_dead = if let Some(head_point) = snake.points.get(0) {
+                self.points_set.contains(head_point)
+            } else {
+                false
+            };
+            snake.is_alive = !is_dead;
+
+            for &point in snake.points.iter() {
+                self.points_set.insert(point);
+            }
+
         }
         //TODO detect collisions
     }

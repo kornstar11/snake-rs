@@ -71,6 +71,9 @@ fn main() {
                     let mapped_tx = update_rx.forward(ws_tx);
 
                     let rx_fut = rx.map(move |input: Message| {
+                        if !input.is_text() {
+                            return;
+                        }
                         let message_string = input.to_str().unwrap();
                         handle_game_input(message_string, snake_id, state.clone())
                     });
@@ -79,7 +82,7 @@ fn main() {
                     let selected = futures::Future::select2(mapped_tx, mapped_rx)
                         .map_err(|_| ())
                         .map(move |_| {
-                           log::info!("Disconnecting...");
+                           println!("Disconnecting...");
                         });
                     selected
                 })
@@ -127,7 +130,7 @@ fn handle_game_input(message_string: &str, snake_id: usize, state: Arc<Mutex<Gam
     };//serde_json::from_str(message_string).unwrap();
 
     if let Some(direction) = direction {
-        println!(
+        log::info!(
             "Got input {} {:?} {:?}",
             snake_id,
             message_string,

@@ -15,23 +15,30 @@ jQuery( document ).ready(function() {
       let message = event.data;
       let obj = JSON.parse(message);
       let my_snake = obj["my_snake"][1];
+      let other_snakes = obj["other_snakes"];
       let points = my_snake["points"];
+      render_snake(points);
 
-      ctx.beginPath();
-      let first = true;
-      for (const idx in points) {
-        let point = points[idx];
-        if(first == true) {
-            ctx.moveTo(point["x"], point["y"]);
-            first = false;
-        } else {
-            ctx.lineTo(point["x"], point["y"]);
-        }
-     }
-     ctx.stroke();
-
-      //console.log(obj, my_snake);
+      for(i = 0; i < other_snakes.length; i++) {
+        let other_snake = other_snakes[i][1];
+        render_snake(other_snake['points']);
+      }
     };
+
+    function render_snake(points) {
+        ctx.beginPath();
+        let first = true;
+        for (const idx in points) {
+          let point = points[idx];
+          if(first == true) {
+              ctx.moveTo(point["x"], point["y"]);
+              first = false;
+          } else {
+              ctx.lineTo(point["x"], point["y"]);
+          }
+        }
+        ctx.stroke();
+    }
 
     document.addEventListener('keydown', (event) => {
         console.log(event)
