@@ -14,16 +14,30 @@ jQuery( document ).ready(function() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       let message = event.data;
       let obj = JSON.parse(message);
-      let my_snake = obj["my_snake"][1];
-      let other_snakes = obj["other_snakes"];
-      let points = my_snake["points"];
+      let foods = obj['foods']
+      let my_snake = obj['my_snake'][1];
+      let other_snakes = obj['other_snakes'];
+      let points = my_snake['points'];
       render_snake(points);
+      render_boxes(foods);
 
       for(i = 0; i < other_snakes.length; i++) {
         let other_snake = other_snakes[i][1];
         render_snake(other_snake['points']);
       }
     };
+
+    function render_boxes(boxes) {
+        for (const idx in boxes) {
+          let box = boxes[idx];
+          let x = box['start_point']['x'];
+          let y = box['start_point']['y'];
+          let width = box['width'];
+          let height = box['height'];
+
+          ctx.fillRect(x, y, width,height);
+        }
+    }
 
     function render_snake(points) {
         ctx.beginPath();

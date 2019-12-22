@@ -6,8 +6,7 @@ use futures::future::Future;
 use futures::stream::Stream;
 use futures::sync::mpsc::channel;
 use futures::sync::mpsc::Sender;
-use snake_rs::game::{Direction, GameState, Snake, StateUpdate};
-use std::collections::HashMap;
+use snake_rs::game::{Direction, GameState, Snake, InputStateUpdate, OutputStateUpdate};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
@@ -18,7 +17,7 @@ fn main() {
     //simple_logger::init().unwrap();
 
     let game_state_arc: Arc<Mutex<GameState>> = Arc::new(Mutex::new(GameState::new()));
-    let game_tick: Arc<Mutex<Vec<Sender<HashMap<usize, Snake>>>>> = Arc::new(Mutex::new(vec![]));
+    let game_tick: Arc<Mutex<Vec<Sender<OutputStateUpdate>>>> = Arc::new(Mutex::new(vec![]));
     let ticker_fut = start_ticking(game_state_arc.clone(), game_tick.clone());
 
     let assets = warp::fs::dir("assets");
@@ -54,14 +53,16 @@ fn main() {
                         .map_err(|()| -> warp::Error { unreachable!("whoa") })
                         .map(move |state| {
                             //let my_snake = state.get(&snake_id).expect("missing id");
-                            let (my_snake, other_snakes): (Vec<(&usize, &Snake)>, Vec<(&usize, &Snake)>) = state
+                            let (my_snake, other_snakes): (Vec<(&usize, &Snake)>, Vec<(&usize, &Snake)>) = state.get_snakes()
                                 .iter()
                                 .partition(|t| {
                                     let (&id, _) = t;
                                     id == snake_id
                                 });
                             let my_snake = my_snake.first().expect("missing snake id");
+                            let foods = state.get_foods();
                             let json_blob = serde_json::json!({
+                                "foods": foods,
                                 "my_snake": my_snake,
                                 "other_snakes": other_snakes
                             });
@@ -84,7 +85,7 @@ fn main() {
                         .map_err(|_| ())
                         .map(move |_| {
                             let mut state_2 = state_2.lock().unwrap();
-                            state_2.handle(StateUpdate::DropSnake(snake_id));
+                            state_2.handle(InputStateUpdate::DropSnake(snake_id));
                             println!("Disconnecting...");
                         });
                     selected
@@ -105,7 +106,7 @@ fn main() {
         );
     let server_fut  = {
         let srv = warp::serve(routes);
-        let (addr, fut) = srv.bind_ephemeral(([127, 0, 0, 1], 3031));
+        let (addr, fut) = srv.bind_ephemeral(([0, 0, 0, 0], 3031));
         log::info!("Listening on {:?}", addr);
         fut
     };//.run(([127, 0, 0, 1], 3031));
@@ -140,13 +141,13 @@ fn handle_game_input(message_string: &str, snake_id: usize, state: Arc<Mutex<Gam
             direction
         );
         let mut state = state.lock().unwrap();
-        state.handle(StateUpdate::ChangeDirection(snake_id, direction));
+        state.handle(InputStateUpdate::ChangeDirection(snake_id, direction));
     }
 }
 
 fn start_ticking(
     game_state_arc: Arc<Mutex<GameState>>,
-    to_send: Arc<Mutex<Vec<Sender<HashMap<usize, Snake>>>>>,
+    to_send: Arc<Mutex<Vec<Sender<OutputStateUpdate>>>>,
 ) -> impl Future<Item = (), Error = ()> {
     let local_state = game_state_arc.clone();
     let ticker = Interval::new(Instant::now(), Duration::from_millis(100));
@@ -154,16 +155,17 @@ fn start_ticking(
         //.map_err(|e| panic!("timer failed; err={:?}", e))
         .for_each(move |_| {
             let local_state = local_state.clone();
-            let mut local_state = local_state.try_lock().unwrap(); //.handle(StateUpdate::Tick);
+            let mut local_state = local_state.lock().unwrap(); //.handle(StateUpdate::Tick);
             let to_send = to_send.clone();
-            let mut to_send = to_send.try_lock().unwrap(); //.handle(StateUpdate::Tick);
-            local_state.handle(StateUpdate::Tick);
+            let mut to_send = to_send.lock().unwrap(); //.handle(StateUpdate::Tick);
+            local_state.handle(InputStateUpdate::Tick);
+            let update = local_state.get_state();
 
             to_send.retain(|sender| !sender.is_closed());//.iter_mut().filter(|sender| )
 
             for send_to in to_send.iter_mut() {
                 send_to
-                    .try_send(local_state.get_snakes())
+                    .try_send(update.clone())
                     .expect("to_send failed");
             }
 

@@ -1,7 +1,9 @@
 extern crate log;
+extern crate rand;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use rand::Rng;
 
 #[derive(Debug, Clone, Serialize, Hash, PartialEq, Eq, Copy)]
 pub struct Point {
@@ -11,14 +13,40 @@ pub struct Point {
 
 impl Point {
     pub fn new(x: usize, y: usize) -> Point {
-        Point { x: x, y: x }
+        Point { x: x, y: y }
     }
 }
 
-pub struct Box {
+#[derive(Debug, Clone, Serialize, Hash, PartialEq, Eq, Copy)]
+pub struct BoxShape {
     start_point: Point,
-    width: usize,
-    height: usize
+    width: isize,
+    height: isize
+}
+
+impl BoxShape {
+    ///
+    /// Makes a square box at a given starting point
+    pub fn new(start_point: Point, size: isize) -> BoxShape {
+        BoxShape {
+            start_point: start_point,
+            width: size,
+            height: size
+        }
+    }
+
+    pub fn intersects(&self, point: &Point) -> bool {
+        let end_x = self.start_point.x as isize + self.width;
+        let end_y = self.start_point.y as isize + self.height;
+
+        let (start_x, end_x) = ((self.start_point.x as isize).min(end_x), (self.start_point.x as isize).max(end_x));
+        let (start_y, end_y) = ((self.start_point.y as isize).min(end_y), (self.start_point.y as isize).max(end_y));
+
+        point.x as isize >= start_x &&
+            point.x as isize <= end_x &&
+            point.y as isize >= start_y &&
+            point.y as isize <= end_y
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,7 +78,7 @@ impl Snake {
     }
 
     pub fn grow(&mut self, grow_by: usize) {
-        self.length = self.length + 1;
+        self.length = self.length + grow_by;
     }
 
     fn add_point(&mut self, point: Point) {
@@ -108,53 +136,110 @@ impl Snake {
 }
 
 #[derive(Debug)]
-pub enum StateUpdate {
+pub enum InputStateUpdate {
     Tick,
     ChangeDirection(usize, Direction),
     DropSnake(usize),
 }
 
+#[derive(Debug, Clone)]
+pub struct OutputStateUpdate {
+    snakes: HashMap<usize, Snake>,
+    foods: HashSet<BoxShape>,
+}
+
+impl OutputStateUpdate {
+    pub fn get_snakes(&self) -> &HashMap<usize, Snake> {
+        &self.snakes
+    }
+
+    pub fn get_foods(&self) -> &HashSet<BoxShape> {
+        &self.foods
+    }
+}
+
+
+
 #[derive(Debug)]
 pub struct GameState {
     snakes: HashMap<usize, Snake>,
     id_gen: AtomicUsize,
-    points_set: HashSet<Point>,
-    food_set: HashSet<Point>,
+    food_set: HashSet<BoxShape>,
+    food_count: usize,
     x_size: usize,
-    y_size: usize
-
+    y_size: usize,
+    food_size: usize
 }
 
 impl GameState {
     pub fn new() -> GameState {
         let snakes: HashMap<usize, Snake> = HashMap::new();
-        let points_set: HashSet<Point> = HashSet::new();
-        let food_set: HashSet<Point> = HashSet::new();
+        let food_set: HashSet<BoxShape> = HashSet::new();
         let id_gen = AtomicUsize::new(0);
 
-        GameState { snakes, id_gen, points_set, food_set,x_size: 768, y_size: 512 }
+        GameState { snakes, id_gen, food_set, food_count: 3, x_size: 768, y_size: 512, food_size:5 }
     }
 
-    fn tick(&mut self) {
-        for (_, snake) in self.snakes.iter_mut() {
+    fn tick(&mut self) -> () {
+        //let mut snake_point_set: HashMap<Point, usize> = HashMap::new();
+        for (snake_id, snake) in self.snakes.iter_mut() {
+            //for pt in snake.points {
+            //    snake_point_set.insert(pt, *snake_id);
+            //}
             snake.tick();
         }
 
-        self.points_set.clear();
-        for (_, snake) in self.snakes.iter_mut() {
+        //println!("points: {:?}", self.points_set);
+
+        for (snake_id, snake) in self.snakes.iter_mut() {
+            // check if this snake has hit another
             let is_dead = if let Some(head_point) = snake.points.get(0) {
-                self.points_set.contains(head_point)
+                let is_dead = {
+                    false
+                }; //self.points_set.contains(head_point);
+                println!("is_Dead1 {}", is_dead);
+                if !is_dead {
+                    //check if we ate food
+                    //snake.grow(10);
+                    let mut ate_food = false;
+                    self.food_set.retain(|&f| {
+                        let eaten = f.intersects(head_point);
+                        if eaten {
+                            println!("Snake ate: {}, {:?} {:?}", eaten, head_point, f);
+                            ate_food = true;
+                        }
+                        !eaten
+                    });
+
+                    if ate_food {
+                        snake.grow(10);
+                    }
+                }
+
+                is_dead
             } else {
                 false
             };
             snake.is_alive = !is_dead;
 
-            for &point in snake.points.iter() {
-                self.points_set.insert(point);
-            }
-
         }
+
+        self.generate_food();
         //TODO detect collisions
+    }
+
+    fn generate_food(&mut self) {
+        if self.food_set.len() >= self.food_count {
+            return;
+        }
+        let to_create = self.food_count - self.food_set.len();
+        let mut rng = rand::thread_rng();
+        for _ in 0..to_create {
+            let x =  rng.gen_range(0, 75);//self.x_size - self.food_size);
+            let y =  rng.gen_range(0, 75);//self.y_size - self.food_size);
+
+            self.food_set.insert(BoxShape::new(Point{x, y}, self.food_size as isize));
+        }
     }
 
     pub fn get_snakes_ref(&self) -> &HashMap<usize, Snake> {
@@ -165,20 +250,31 @@ impl GameState {
         self.snakes.clone()
     }
 
-    pub fn handle(&mut self, update: StateUpdate) {
+    pub fn get_foods(&self) -> HashSet<BoxShape> {
+        self.food_set.clone()
+    }
+
+    pub fn get_state(&self) -> OutputStateUpdate {
+        OutputStateUpdate{
+            snakes: self.get_snakes(),
+            foods: self.get_foods()
+        }
+    }
+
+    pub fn handle(&mut self, update: InputStateUpdate) {
         log::debug!("Handling {:?}", update);
         match update {
-            StateUpdate::Tick => {
+            InputStateUpdate::Tick => {
                 self.tick();
             }
-            StateUpdate::ChangeDirection(id, direction) => {
+            InputStateUpdate::ChangeDirection(id, direction) => {
                 if let Some(snake) = self.snakes.get_mut(&id) {
                     snake.set_direction(direction);
                 } else {
                     log::warn!("Missing id {}", id);
                 }
             }
-            StateUpdate::DropSnake(id) => {
+            InputStateUpdate::DropSnake(id) => {
                 self.snakes.remove(&id);
             }
         }
