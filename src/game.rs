@@ -177,7 +177,7 @@ impl GameState {
         let food_set: HashSet<BoxShape> = HashSet::new();
         let id_gen = AtomicUsize::new(0);
 
-        GameState { snakes, id_gen, food_set, food_count: 3, x_size: 768, y_size: 512, food_size:5 }
+        GameState { snakes, id_gen, food_set, food_count: 30, x_size: 768, y_size: 512, food_size:5 }
     }
 
     fn tick(&mut self) -> () {
@@ -235,8 +235,8 @@ impl GameState {
         let to_create = self.food_count - self.food_set.len();
         let mut rng = rand::thread_rng();
         for _ in 0..to_create {
-            let x =  rng.gen_range(0, 400);//self.x_size - self.food_size);
-            let y =  rng.gen_range(0, 400);//self.y_size - self.food_size);
+            let x =  rng.gen_range(0,self.x_size - self.food_size);
+            let y =  rng.gen_range(0,self.y_size - self.food_size);
 
             self.food_set.insert(BoxShape::new(Point{x, y}, self.food_size as isize));
         }
