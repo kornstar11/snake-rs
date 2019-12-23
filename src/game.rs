@@ -181,46 +181,46 @@ impl GameState {
     }
 
     fn tick(&mut self) -> () {
-        //let mut snake_point_set: HashMap<Point, usize> = HashMap::new();
+        let mut snake_point_set: HashMap<&Point, usize> = HashMap::new();
+        let mut dead_snakes: Vec<usize> = vec![];
         for (snake_id, snake) in self.snakes.iter_mut() {
-            //for pt in snake.points {
-            //    snake_point_set.insert(pt, *snake_id);
-            //}
             snake.tick();
+            let mut first = true;
+            for pt in snake.points.iter() {
+                if let Some(collide_id) = snake_point_set.insert(pt, *snake_id) {
+                    if first { //if our head hit another we are dead
+                        dead_snakes.push(snake_id.clone());
+                    } else { //the other snake must have hit us
+                        dead_snakes.push(collide_id)
+                    }
+                    first = false;
+                }
+            }
         }
 
-        //println!("points: {:?}", self.points_set);
+        self.snakes.retain(|id, _| !dead_snakes.contains(id));
 
         for (snake_id, snake) in self.snakes.iter_mut() {
             // check if this snake has hit another
-            let is_dead = if let Some(head_point) = snake.points.get(0) {
-                let is_dead = {
-                    false
-                }; //self.points_set.contains(head_point);
-                println!("is_Dead1 {}", is_dead);
-                if !is_dead {
-                    //check if we ate food
-                    //snake.grow(10);
-                    let mut ate_food = false;
-                    self.food_set.retain(|&f| {
-                        let eaten = f.intersects(head_point);
-                        if eaten {
-                            println!("Snake ate: {}, {:?} {:?}", eaten, head_point, f);
-                            ate_food = true;
-                        }
-                        !eaten
-                    });
-
-                    if ate_food {
-                        snake.grow(10);
+            if let Some(head_point) = snake.points.get(0) {
+                //check if we ate food
+                //snake.grow(10);
+                let mut ate_food = false;
+                self.food_set.retain(|&f| {
+                    let eaten = f.intersects(head_point);
+                    if eaten {
+                        println!("Snake ate: {}, {:?} {:?}", eaten, head_point, f);
+                        ate_food = true;
                     }
+                    !eaten
+                });
+
+                if ate_food {
+                    snake.grow(10);
                 }
 
-                is_dead
-            } else {
-                false
-            };
-            snake.is_alive = !is_dead;
+            }
+            snake.is_alive = true;
 
         }
 
